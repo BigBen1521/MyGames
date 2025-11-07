@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간단한 스네이크 게임</title>
+    <style>
+        /* 🎨 CSS 스타일링 */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #333; /* 어두운 배경 */
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .game-container {
+            border: 5px solid #00ff00; /* 네온 그린 테두리 */
+            background-color: #000;
+            padding: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+
+        #gameCanvas {
+            display: block;
+            background-color: #222;
+        }
+
+        .game-info {
+            width: 400px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+            color: #00ff00;
+        }
+
+        .game-info button {
+            background-color: #00ff00;
+            border: none;
+            padding: 5px 10px;
+            font-size: 1em;
+            cursor: pointer;
+            color: #000;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="game-info">
+            <span>점수: <span id="score">0</span></span>
+            <button id="startButton">게임 시작</button>
+        </div>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+    </div>
+
+    <script>
+        // 🐍 JavaScript 게임 로직
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const startButton = document.getElementById('startButton');
+
+        const gridSize = 20; // 그리드 셀 크기
+        const tileCount = canvas.width / gridSize;
+
+        let snake = [];
+        let dx = gridSize; // X 방향 속도 (오른쪽 시작)
+        let dy = 0;        // Y 방향 속도
+        let food = {};
+        let score = 0;
+        let gameLoopInterval;
+        let isGameOver = true;
+        let changingDirection = false;
+
+        // 게임 초기 상태 설정
+        function initializeGame() {
+            snake = [
+                { x: 6 * gridSize, y: 10 * gridSize },
+                { x: 5 * gridSize, y: 10 * gridSize },
+                { x: 4 * gridSize, y: 10 * gridSize }
+            ];
+            dx = gridSize;
+            dy = 0;
+            score = 0;
+            scoreElement.textContent = score;
+            isGameOver = false;
+            changingDirection = false;
+            placeFood();
+            
+            // 기존 인터벌이 있으면 제거하고 새로 시작
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameLoop, 150); // 뱀 속도 (150ms 마다 업데이트)
+            startButton.textContent = "다시 시작";
+        }
+
+        // 먹이 무작위 배치
+        function placeFood() {
+            let newFoodPos;
+            do {
+                newFoodPos = {
+                    x: Math.floor(Math.random() * tileCount) * gridSize,
+                    y: Math.floor(Math.random() * tileCount) * gridSize
+                };
+            } while (isFoodOnSnake(newFoodPos)); 
+            food = newFoodPos;
+        }
+
+        // 먹이가 뱀 위에 있는지 확인
+        function isFoodOnSnake(pos) {
+            return snake.some(segment => segment.x === pos.x && segment.y === pos.y);
+        }
+
+        // 메인 게임 루프
+        function gameLoop() {
+            if (isGameOver) return;
+            changingDirection = false;
+
+            if (checkCollision()) {
+                endGame();
+                return;
+            }
+
+            moveSnake();
+            drawGame();
+        }
+
+        // 뱀 이동 및 먹이 섭취
+        function moveSnake() {
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            // 벽 통과 (캔버스 가장자리에서 반대편으로 이동)
+            if (head.x < 0) head.x = canvas.width - gridSize;
+            else if (head.x >= canvas.width) head.x = 0;
+            else if (head.y < 0) head.y = canvas.height - gridSize;
+            else if (head.y >= canvas.height) head.y = 0;
+
+            snake.unshift(head); // 새 머리 추가
+
+            // 먹이 섭취 확인
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreElement.textContent = score;
+                placeFood(); // 새 먹이 배치
+                // 꼬리를 제거하지 않아 뱀 길이가 늘어남
+            } else {
+                snake.pop(); // 먹지 않았으면 꼬리 제거 (이동)
+            }
+        }
+
+        // 충돌 감지 (자신의 몸통과 충돌)
+        function checkCollision() {
+            const head = snake[0];
+            // 머리가 몸통의 나머지 부분(1번 인덱스부터)과 충돌하는지 확인
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 게임 종료
+        function endGame() {
+            isGameOver = true;
+            clearInterval(gameLoopInterval);
+            alert(`게임 오버! 최종 점수: ${score}`);
+            startButton.textContent = "다시 시작";
+        }
+
+        // 게임 요소 그리기
+        function drawGame() {
+            // 캔버스 초기화
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 먹이 그리기 (빨간색)
+            ctx.fillStyle = 'red';
+            ctx.fillRect(food.x, food.y, gridSize, gridSize);
+
+            // 뱀 그리기 (초록색)
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = (index === 0) ? '#00ff00' : '#00cc00'; // 머리는 밝게
+                ctx.fillRect(segment.x, segment.y, gridSize, gridSize);
+                
+                // 경계선 추가 (선택 사항)
+                ctx.strokeStyle = '#000';
+                ctx.strokeRect(segment.x, segment.y, gridSize, gridSize);
+            });
+        }
+
+        // 키보드 입력 처리
+        document.addEventListener('keydown', (event) => {
+            if (changingDirection || isGameOver) return;
+            changingDirection = true;
+
+            const keyPressed = event.key;
+            const goingUp = dy === -gridSize;
+            const goingDown = dy === gridSize;
+            const goingLeft = dx === -gridSize;
+            const goingRight = dx === gridSize;
+
+            // 반대 방향으로의 즉시 전환 방지
+            if (keyPressed === 'ArrowLeft' && !goingRight) {
+                dx = -gridSize; dy = 0;
+            } else if (keyPressed === 'ArrowUp' && !goingDown) {
+                dx = 0; dy = -gridSize;
+            } else if (keyPressed === 'ArrowRight' && !goingLeft) {
+                dx = gridSize; dy = 0;
+            } else if (keyPressed === 'ArrowDown' && !goingUp) {
+                dx = 0; dy = gridSize;
+            }
+        });
+
+        // 시작 버튼 이벤트 리스너
+        startButton.addEventListener('click', initializeGame);
+
+        // 초기 화면 그리기
+        drawGame(); 
+    </script>
+</body>
+</html>
